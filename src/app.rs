@@ -529,8 +529,9 @@ impl App {
 
     pub fn reload_channels(&mut self) {
         match self.store.channels() {
-            Ok(channels) => {
+            Ok(mut channels) => {
                 let active = self.active.clone();
+                crate::model::sort_for_sidebar(&mut channels);
                 self.channels = channels;
                 if let Some(active) = active
                     && let Some(index) = self.channels.iter().position(|c| c.id == active)

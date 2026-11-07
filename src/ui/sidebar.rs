@@ -12,7 +12,7 @@ use ratatui::widgets::Paragraph;
 
 use super::{text, widgets};
 use crate::app::{App, Focus};
-use crate::model::{Channel, ChannelKind};
+use crate::model::{Channel, ChannelKind, SidebarSection};
 
 /// One rendered row, resolved before drawing so scrolling can work on rows
 /// rather than on a mix of headings and entries.
@@ -34,17 +34,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         ..area
     };
 
-    let pinned: Vec<&Channel> = app.channels.iter().filter(|c| c.pinned).collect();
-    let groups: Vec<&Channel> = app
-        .channels
-        .iter()
-        .filter(|c| c.kind == ChannelKind::Group && !c.hidden && !c.pinned)
-        .collect();
-    let directs: Vec<&Channel> = app
-        .channels
-        .iter()
-        .filter(|c| (c.kind == ChannelKind::Direct || c.hidden) && !c.pinned)
-        .collect();
+    let in_section = |section: SidebarSection| -> Vec<&Channel> {
+        app.channels
+            .iter()
+            .filter(|c| c.section() == section)
+            .collect()
+    };
+    let pinned = in_section(SidebarSection::Pinned);
+    let groups = in_section(SidebarSection::Channels);
+    let directs = in_section(SidebarSection::Direct);
 
     let mut rows: Vec<Row> = Vec::with_capacity(app.channels.len() + 7);
     if !pinned.is_empty() {
