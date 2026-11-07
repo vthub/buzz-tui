@@ -36,7 +36,25 @@ pub struct Channel {
     pub mentions: u32,
 }
 
+/// Which sidebar section a conversation is drawn in, top to bottom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SidebarSection {
+    Pinned,
+    Channels,
+    Direct,
+}
+
 impl Channel {
+    pub fn section(&self) -> SidebarSection {
+        if self.pinned {
+            SidebarSection::Pinned
+        } else if self.kind == ChannelKind::Direct || self.hidden {
+            SidebarSection::Direct
+        } else {
+            SidebarSection::Channels
+        }
+    }
+
     /// The sigil that precedes a conversation name, distinguishing groups,
     /// private groups, and direct messages at a glance.
     pub fn sigil(&self) -> &'static str {
@@ -157,9 +175,49 @@ impl Presence {
     }
 }
 
+/// Put conversations in the order the sidebar draws them (pinned, channels,
+/// direct messages), keeping the store's order within each section. Cursor
+/// movement walks this vector, so it must match what is on screen.
+pub fn sort_for_sidebar(channels: &mut [Channel]) {
+    channels.sort_by_key(Channel::section);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn conversation(id: &str, kind: ChannelKind, hidden: bool, pinned: bool) -> Channel {
+        Channel {
+            id: id.to_string(),
+            name: id.to_string(),
+            about: None,
+            kind,
+            private: false,
+            hidden,
+            joined: true,
+            muted: false,
+            pinned,
+            last_activity: 0,
+            unread: 0,
+            mentions: 0,
+        }
+    }
+
+    #[test]
+    fn the_sidebar_order_groups_pinned_channels_then_direct_messages() {
+        // The store orders by recent activity, so the sections interleave.
+        let mut list = vec![
+            conversation("dm1", ChannelKind::Direct, false, false),
+            conversation("g1", ChannelKind::Group, false, false),
+            conversation("legacy-dm", ChannelKind::Group, true, false),
+            conversation("g2", ChannelKind::Group, false, false),
+            conversation("pinned-dm", ChannelKind::Direct, false, true),
+            conversation("dm2", ChannelKind::Direct, false, false),
+        ];
+        sort_for_sidebar(&mut list);
+        let ids: Vec<&str> = list.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["pinned-dm", "g1", "g2", "dm1", "legacy-dm", "dm2"]);
+    }
 
     fn message(id: &str, parent: Option<&str>, root: Option<&str>) -> Message {
         Message {
